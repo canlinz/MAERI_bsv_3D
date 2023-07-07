@@ -43,6 +43,8 @@ import DN_DistributionNetwork::*;
 import MN_MultiplierNetwork::*;
 import RN_ReductionNetwork::*;
 
+import MAERI_Accelerator_T0::*;
+import MAERI_Accelerator_T1::*;
 import MAERI_Accelerator::*;
 
 

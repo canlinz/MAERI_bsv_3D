@@ -37,10 +37,8 @@ import DN_DistributionNetwork::*;
 import MN_MultiplierNetwork::*;
 import RN_ReductionNetwork::*;
 
-
-interface DN_TopControlPorts;
-  method Action putConfig(DN_SubTreeDestBits newConfig);
-endinterface 
+import MAERI_Accelerator_T0::*;
+import MAERI_Accelerator_T1::*;
 
 
 interface MAERI_Accelerator_ControlPorts;
@@ -60,81 +58,27 @@ endinterface
 (* synthesize *)
 module mkMAERI_Accelerator(MAERI_Accelerator);
   /* Submodules */
-  DN_DistributionNetwork dn <- mkDN_DistributionNetwork;
-  MN_MultiplierNetwork mn <- mkMN_MultiplierNetwork;
-  RN_ReductionNetwork rn <- mkRN_ReductionNetwork;
+  MAERI_Accelerator_T0 t0 <- mkMAERI_Accelerator_T0;
+  MAERI_Accelerator_T1 t1 <- mkMAERI_Accelerator_T1;
 
-  /* Interconnect DN and MN */
-  for(Integer multSwID = 0; multSwID < valueOf(NumMultSwitches); multSwID = multSwID +1) begin
-    mkConnection(dn.outputDataPorts[multSwID].getData, mn.dataPorts[multSwID].putData);
-  end
+  /* Interconnect T0 and T1 */
+  for(Integer multSwID = 0; multSwID < valueOf(NumMultSwitches); multSwID = multSwID + 1) begin
+    mkConnection(t0.dnDataPorts[multSwID].getData, t1.mnDataPorts[multSwID].putData);
+  end 
 
-  /* Interconnect MN and RN */
-  for(Integer multSwID = 0; multSwID < valueOf(NumMultSwitches); multSwID = multSwID +1) begin
-    mkConnection(mn.dataPorts[multSwID].getData, rn.inputDataPorts[multSwID].putData);
-  end
+  /* Interface assignment */
+  interface inputDataPorts = t0.inputDataPorts;
+  interface outputDataPorts = t1.outputDataPorts;
 
-
-  /* Interfaces */
-  Vector#(DistributionBandwidth, GI_InputDataPorts) inputDataPortsDef;
-  for(Integer inPrt = 0; inPrt < valueOf(DistributionBandwidth); inPrt = inPrt +1) begin
-    inputDataPortsDef[inPrt] = 
-      interface GI_InputDataPorts
-        method Action putData(Data data);
-          dn.inputDataPorts[inPrt].putData(data);
-        endmethod
-      endinterface;
-  end
-
-  Vector#(CollectionBandwidth, GI_OutputDataPorts) outputDataPortsDef;
-  for(Integer outPrt = 0; outPrt < valueOf(CollectionBandwidth); outPrt = outPrt +1) begin
-    outputDataPortsDef[outPrt] =
-      interface GI_OutputDataPorts
-        method ActionValue#(Data) getData;
-          let ret <- rn.outputDataPorts[outPrt].getData;
-          return ret;
-        endmethod
-      endinterface;
-
-  end
-
-  Vector#(DistributionBandwidth, DN_TopControlPorts) dnControlPortsDef;
-  for(Integer prt = 0; prt < valueOf(DistributionBandwidth); prt = prt + 1) begin
-    dnControlPortsDef[prt] =
-      interface DN_TopControlPorts
-        method Action putConfig(DN_SubTreeDestBits newConfig);
-          if(newConfig != dn_topSubtree_nullConfig) begin
-            dn.controlPorts[prt].putConfig(newConfig); 
-          end
-        endmethod
-      endinterface;
-  end
-
-  interface inputDataPorts = inputDataPortsDef;
-  interface outputDataPorts = outputDataPortsDef;
-
+  /* Control Ports */
   interface controlPorts = 
     interface MAERI_Accelerator_ControlPorts
-      method Bool isReadyForNextConfig;
-        return dn.isEmpty;
-      endmethod
-      interface mnControlPorts = 
-        interface MN_MultiplierNetwork_ControlPorts
-          method Action putConfig(MN_Config newConfig, StatData numActualActiveMultSwitches);
-            mn.controlPorts.putConfig(newConfig, numActualActiveMultSwitches);
-          endmethod
-        endinterface;
-
-      interface rnControlPorts = 
-        interface RN_ReductionNetwork_ControlPorts
-          method Action putConfig(RN_Config newConfig);
-            rn.controlPorts.putConfig(newConfig);
-          endmethod
-        endinterface;
-
-      interface dnControlPorts = dnControlPortsDef;
-
+      method Bool isReadyForNextConfig = t0.controlPorts.isReadyForNextConfig;
+      interface dnControlPorts = t0.controlPorts.dnControlPorts;
+      interface rnControlPorts = t1.controlPorts.rnControlPorts;
+      interface mnControlPorts = t1.controlPorts.mnControlPorts;
     endinterface;
 
 endmodule
+
 
